@@ -1,0 +1,1369 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClaw Assistant</title>
+    <style>
+      /* ── Reset & Variables ── */
+      :root {
+        --bg: #f4f2ee;
+        --surface: rgba(0, 0, 0, 0.025);
+        --surface-hover: rgba(0, 0, 0, 0.045);
+        --glass: rgba(255, 255, 255, 0.55);
+        --glass-border: rgba(0, 0, 0, 0.07);
+        --text: #1a1a1e;
+        --text-secondary: rgba(0, 0, 0, 0.48);
+        --text-tertiary: rgba(0, 0, 0, 0.28);
+        --accent: #8a7055;
+        --accent-glow: rgba(138, 112, 85, 0.1);
+        --ok: #2d8a5e;
+        --danger: #c04040;
+        --radius-lg: 28px;
+        --radius-md: 18px;
+        --radius-sm: 12px;
+        --radius-pill: 999px;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        min-height: 100vh;
+        font-family: "SF Pro Display", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Animated Background Layer ── */
+      .bg-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      /* Gradient Orbs */
+      .orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(100px);
+        opacity: 0.35;
+        will-change: transform;
+      }
+
+      .orb-1 {
+        width: 600px; height: 600px;
+        background: radial-gradient(circle, #e8d5c0 0%, transparent 70%);
+        top: -15%; left: -10%;
+        animation: orbFloat1 25s ease-in-out infinite;
+      }
+
+      .orb-2 {
+        width: 500px; height: 500px;
+        background: radial-gradient(circle, #d5dce8 0%, transparent 70%);
+        top: 40%; right: -12%;
+        animation: orbFloat2 30s ease-in-out infinite;
+      }
+
+      .orb-3 {
+        width: 400px; height: 400px;
+        background: radial-gradient(circle, #e0d0d8 0%, transparent 70%);
+        bottom: -10%; left: 30%;
+        animation: orbFloat3 20s ease-in-out infinite;
+      }
+
+      @keyframes orbFloat1 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(80px, 60px) scale(1.1); }
+        66% { transform: translate(-40px, 30px) scale(0.95); }
+      }
+
+      @keyframes orbFloat2 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(-60px, -40px) scale(0.9); }
+        66% { transform: translate(50px, 50px) scale(1.08); }
+      }
+
+      @keyframes orbFloat3 {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(70px, -50px) scale(1.12); }
+      }
+
+      /* Grain texture overlay */
+      .grain {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        opacity: 0.018;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='1'/%3E%3C/svg%3E");
+        background-size: 256px 256px;
+      }
+
+      /* Floating small decorative elements */
+      .floaters {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      .floater {
+        position: absolute;
+        opacity: 0;
+        animation: floaterDrift linear infinite;
+      }
+
+      .floater-dot {
+        width: 3px; height: 3px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.08);
+      }
+
+      .floater-ring {
+        width: 12px; height: 12px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+      }
+
+      .floater-cross {
+        width: 8px; height: 8px;
+        position: relative;
+      }
+
+      .floater-cross::before,
+      .floater-cross::after {
+        content: '';
+        position: absolute;
+        background: rgba(0, 0, 0, 0.06);
+      }
+
+      .floater-cross::before {
+        width: 1px; height: 100%;
+        left: 50%; transform: translateX(-50%);
+      }
+
+      .floater-cross::after {
+        width: 100%; height: 1px;
+        top: 50%; transform: translateY(-50%);
+      }
+
+      .floater-line {
+        width: 20px; height: 1px;
+        background: rgba(0, 0, 0, 0.04);
+        transform-origin: center;
+      }
+
+      @keyframes floaterDrift {
+        0% {
+          opacity: 0;
+          transform: translateY(100vh) rotate(0deg);
+        }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% {
+          opacity: 0;
+          transform: translateY(-100px) rotate(180deg);
+        }
+      }
+
+      /* Canvas for particle network */
+      #particleCanvas {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+      }
+
+      /* Grid lines decoration */
+      .grid-lines {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0.035;
+        background-image:
+          linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px);
+        background-size: 80px 80px;
+      }
+
+      /* ── Main Content ── */
+      .shell {
+        position: relative;
+        z-index: 10;
+        width: min(960px, 92vw);
+        margin: 0 auto;
+        padding: 40px 0 60px;
+        opacity: 0;
+        animation: fadeUp 0.8s ease-out 0.2s forwards;
+      }
+
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* ── Header ── */
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 4px;
+        margin-bottom: 48px;
+        opacity: 0;
+        animation: fadeUp 0.6s ease-out 0.3s forwards;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .logo-mark {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent) 0%, #b09878 100%);
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -0.03em;
+      }
+
+      .logo-text {
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+
+      .header-badge {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-pill);
+        padding: 6px 14px;
+      }
+
+      /* ── Hero Section ── */
+      .hero {
+        text-align: center;
+        margin-bottom: 56px;
+        opacity: 0;
+        animation: fadeUp 0.8s ease-out 0.5s forwards;
+      }
+
+      .hero-number {
+        display: inline-block;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 20px;
+        position: relative;
+      }
+
+      .hero-number::before,
+      .hero-number::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        width: 40px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        opacity: 0.3;
+      }
+
+      .hero-number::before { right: calc(100% + 14px); }
+      .hero-number::after { left: calc(100% + 14px); }
+
+      h1 {
+        font-size: clamp(42px, 8vw, 80px);
+        font-weight: 300;
+        line-height: 1.0;
+        letter-spacing: -0.04em;
+        color: var(--text);
+        margin-bottom: 16px;
+      }
+
+      h1 strong {
+        font-weight: 600;
+        background: linear-gradient(135deg, #2a2a2e 0%, var(--accent) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .hero-sub {
+        max-width: 480px;
+        margin: 0 auto;
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.7;
+        letter-spacing: 0.01em;
+      }
+
+      .hero-sub code {
+        background: var(--surface);
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-family: "SF Mono", "Fira Code", monospace;
+        color: var(--accent);
+      }
+
+      /* ── Section Divider ── */
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin: 40px 0 28px;
+        opacity: 0;
+        animation: fadeUp 0.6s ease-out 0.7s forwards;
+      }
+
+      .divider-num {
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        color: var(--accent);
+        font-weight: 500;
+        flex-shrink: 0;
+      }
+
+      .divider-label {
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+        flex-shrink: 0;
+      }
+
+      .divider-line {
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, var(--glass-border), transparent);
+      }
+
+      /* ── Action Cards ── */
+      .actions {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, 1fr);
+        opacity: 0;
+        animation: fadeUp 0.8s ease-out 0.8s forwards;
+      }
+
+      .action-btn {
+        appearance: none;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        color: var(--text);
+        padding: 20px 22px;
+        cursor: pointer;
+        text-align: left;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+
+      .action-btn::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, transparent 0%, var(--accent-glow) 100%);
+        opacity: 0;
+        transition: opacity 0.35s ease;
+      }
+
+      .action-btn:hover {
+        border-color: rgba(138, 112, 85, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(138, 112, 85, 0.1);
+      }
+
+      .action-btn:hover::before { opacity: 1; }
+
+      .action-btn:active {
+        transform: translateY(0);
+        transition-duration: 0.1s;
+      }
+
+      .action-btn:disabled {
+        opacity: 0.4;
+        cursor: wait;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .action-btn:disabled::before { opacity: 0; }
+
+      .btn-inner {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .btn-icon {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.04);
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        transition: background 0.3s ease;
+      }
+
+      .action-btn:hover .btn-icon {
+        background: rgba(138, 112, 85, 0.12);
+      }
+
+      .btn-icon svg {
+        width: 18px; height: 18px;
+        color: var(--accent);
+      }
+
+      .btn-label {
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.03em;
+        line-height: 1.3;
+      }
+
+      .btn-desc {
+        font-size: 11px;
+        color: var(--text-tertiary);
+        margin-top: 2px;
+        letter-spacing: 0.02em;
+      }
+
+      /* Full-width last button if odd count */
+      .actions .action-btn:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+      }
+
+      /* ── Status Area ── */
+      .status-bar {
+        margin-top: 16px;
+        padding: 14px 20px;
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        border: 1px solid var(--glass-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 50px;
+        opacity: 0;
+        animation: fadeUp 0.6s ease-out 0.9s forwards;
+      }
+
+      .status-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .status-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--text-tertiary);
+        transition: background 0.3s ease;
+      }
+
+      .status-dot.ok { background: var(--ok); box-shadow: 0 0 8px rgba(45, 138, 94, 0.35); }
+      .status-dot.err { background: var(--danger); box-shadow: 0 0 8px rgba(192, 64, 64, 0.35); }
+      .status-dot.running {
+        background: var(--accent);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(1.4); }
+      }
+
+      .status-text {
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+
+      .status-time {
+        font-size: 11px;
+        color: var(--text-tertiary);
+        letter-spacing: 0.04em;
+      }
+
+      /* ── Address Card ── */
+      .address-card {
+        margin-top: 12px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 14px 18px;
+        display: none;
+        align-items: center;
+        gap: 12px;
+        animation: slideDown 0.3s ease-out;
+      }
+
+      .address-card.show { display: flex; }
+
+      @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .address-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--accent);
+        margin-bottom: 4px;
+      }
+
+      .address-url {
+        flex: 1;
+        white-space: nowrap;
+        overflow-x: auto;
+        font-family: "SF Mono", "Fira Code", Menlo, monospace;
+        font-size: 12px;
+        color: var(--text-secondary);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0,0,0,0.1) transparent;
+      }
+
+      .copy-btn {
+        border: 1px solid var(--glass-border);
+        background: transparent;
+        color: var(--text-secondary);
+        width: 36px; height: 36px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        transition: all 0.25s ease;
+      }
+
+      .copy-btn:hover {
+        background: var(--surface-hover);
+        color: var(--accent);
+        border-color: rgba(138, 112, 85, 0.2);
+      }
+
+      .copy-btn svg { width: 16px; height: 16px; }
+
+      /* ── Token Panel ── */
+      .token-panel {
+        margin-top: 12px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 20px;
+        display: none;
+        animation: slideDown 0.3s ease-out;
+      }
+
+      .token-panel.show { display: block; }
+
+      .token-panel-title {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 16px;
+      }
+
+      .token-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px 16px;
+      }
+
+      .token-field { display: flex; flex-direction: column; gap: 6px; }
+      .token-field.wide { grid-column: 1 / -1; }
+
+      .token-field label {
+        font-size: 10px;
+        color: var(--text-tertiary);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+
+      .token-field select,
+      .token-field input {
+        width: 100%;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.5);
+        padding: 10px 14px;
+        color: var(--text);
+        font-size: 13px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.25s ease, box-shadow 0.25s ease;
+      }
+
+      .token-field select:focus,
+      .token-field input:focus {
+        border-color: rgba(138, 112, 85, 0.35);
+        box-shadow: 0 0 0 3px rgba(138, 112, 85, 0.06);
+      }
+
+      .token-field input::placeholder { color: var(--text-tertiary); }
+      .token-field input[readonly] { color: var(--text-tertiary); }
+      .token-field select option { background: #f4f2ee; color: var(--text); }
+
+      .token-actions {
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .token-msg {
+        font-size: 11px;
+        min-height: 18px;
+        color: var(--text-tertiary);
+        letter-spacing: 0.02em;
+      }
+
+      .token-msg.ok { color: var(--ok); }
+      .token-msg.err { color: var(--danger); }
+
+      .token-save-btn {
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-pill);
+        background: transparent;
+        color: var(--text);
+        padding: 9px 20px;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.3s ease;
+      }
+
+      .token-save-btn:hover {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      .token-save-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      /* ── Output Console ── */
+      .console {
+        margin-top: 12px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-md);
+        background: rgba(30, 30, 36, 0.92);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        overflow: hidden;
+        animation: slideDown 0.3s ease-out;
+      }
+
+      .console-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--glass-border);
+      }
+
+      .console-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+      }
+
+      .console-dot:nth-child(1) { background: #ff5f57; }
+      .console-dot:nth-child(2) { background: #febc2e; }
+      .console-dot:nth-child(3) { background: #28c840; }
+
+      .console-title {
+        margin-left: 8px;
+        font-size: 11px;
+        color: var(--text-tertiary);
+        letter-spacing: 0.06em;
+      }
+
+      .console pre {
+        margin: 0;
+        padding: 16px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        min-height: 100px;
+        max-height: 50vh;
+        overflow: auto;
+        font-family: "SF Mono", "Fira Code", Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.6);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.15) transparent;
+      }
+
+      .console pre::-webkit-scrollbar { width: 4px; }
+      .console pre::-webkit-scrollbar-track { background: transparent; }
+      .console pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+      /* ── Footer ── */
+      .footer {
+        margin-top: 40px;
+        padding: 0 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        opacity: 0;
+        animation: fadeUp 0.6s ease-out 1s forwards;
+      }
+
+      .footer-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .footer-dot {
+        width: 4px; height: 4px;
+        border-radius: 50%;
+        background: var(--accent);
+        opacity: 0.5;
+      }
+
+      .footer-text {
+        font-size: 11px;
+        color: var(--text-tertiary);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .footer-author {
+        font-size: 11px;
+        color: var(--text-tertiary);
+        letter-spacing: 0.08em;
+      }
+
+      /* ── Responsive ── */
+      @media (max-width: 720px) {
+        .shell { padding: 24px 0 40px; }
+        .hero { margin-bottom: 40px; }
+        .actions { grid-template-columns: 1fr; }
+        .token-grid { grid-template-columns: 1fr; }
+        .token-actions {
+          flex-direction: column;
+          align-items: stretch;
+          text-align: center;
+        }
+        .header { margin-bottom: 36px; }
+        .status-bar { flex-direction: column; gap: 8px; align-items: flex-start; }
+      }
+
+      /* ── Smooth scrollbar ── */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+
+    <!-- ── Background Layers ── -->
+    <div class="bg-layer">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="grid-lines"></div>
+    <canvas id="particleCanvas"></canvas>
+    <div class="floaters" id="floaters"></div>
+    <div class="grain"></div>
+
+    <!-- ── Main Content ── -->
+    <main class="shell">
+
+      <!-- Header -->
+      <header class="header">
+        <div class="logo">
+          <div class="logo-mark">OC</div>
+          <span class="logo-text">OpenClaw</span>
+        </div>
+        <span class="header-badge">Local &middot; 127.0.0.1</span>
+      </header>
+
+      <!-- Hero -->
+      <section class="hero">
+        <div class="hero-number">Control Panel</div>
+        <h1>openclaw<strong>助手</strong></h1>
+        <p class="hero-sub">
+          点击下方操作执行本机 OpenClaw 指令。<br />
+          仅监听 <code>127.0.0.1</code>，安全无外网暴露。
+        </p>
+      </section>
+
+      <!-- Section: Actions -->
+      <div class="divider">
+        <span class="divider-num">01</span>
+        <span class="divider-label">Operations</span>
+        <span class="divider-line"></span>
+      </div>
+
+      <section class="actions">
+        <button class="action-btn" data-action="install_update">
+          <span class="btn-inner">
+            <span class="btn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4"/>
+                <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+              </svg>
+            </span>
+            <span>
+              <span class="btn-label">安装 / 更新</span>
+              <div class="btn-desc">Install or update OpenClaw</div>
+            </span>
+          </span>
+        </button>
+
+        <button class="action-btn" data-action="gateway_restart">
+          <span class="btn-inner">
+            <span class="btn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+              </svg>
+            </span>
+            <span>
+              <span class="btn-label">重启网关</span>
+              <div class="btn-desc">Restart gateway service</div>
+            </span>
+          </span>
+        </button>
+
+        <button class="action-btn" data-action="gateway_install">
+          <span class="btn-inner">
+            <span class="btn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="8" rx="2"/>
+                <rect x="2" y="14" width="20" height="8" rx="2"/>
+                <circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/>
+              </svg>
+            </span>
+            <span>
+              <span class="btn-label">重装网关</span>
+              <div class="btn-desc">Reinstall gateway</div>
+            </span>
+          </span>
+        </button>
+
+        <button class="action-btn" data-action="get_frontend_url">
+          <span class="btn-inner">
+            <span class="btn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+              </svg>
+            </span>
+            <span>
+              <span class="btn-label">获取前台地址</span>
+              <div class="btn-desc">Get frontend URL</div>
+            </span>
+          </span>
+        </button>
+
+        <button class="action-btn" data-action="manage_model_token">
+          <span class="btn-inner">
+            <span class="btn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0110 0v4"/>
+                <circle cx="12" cy="16" r="1"/>
+              </svg>
+            </span>
+            <span>
+              <span class="btn-label">更换模型 Token</span>
+              <div class="btn-desc">Manage API tokens</div>
+            </span>
+          </span>
+        </button>
+      </section>
+
+      <!-- Section: Output -->
+      <div class="divider" style="animation-delay: 0.9s;">
+        <span class="divider-num">02</span>
+        <span class="divider-label">Output</span>
+        <span class="divider-line"></span>
+      </div>
+
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <div class="status-left">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="status-text" id="statusText">等待操作...</span>
+        </div>
+        <span class="status-time" id="statusTime"></span>
+      </div>
+
+      <!-- Address Card -->
+      <div class="address-card" id="addressCard">
+        <div style="flex:1;min-width:0">
+          <div class="address-label">Frontend URL</div>
+          <div class="address-url" id="addressText"></div>
+        </div>
+        <button class="copy-btn" id="copyButton" title="复制地址" aria-label="复制地址">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Token Panel -->
+      <section class="token-panel" id="tokenPanel">
+        <div class="token-panel-title">Model Token Management</div>
+        <div class="token-grid">
+          <div class="token-field">
+            <label for="modelSelect">模型</label>
+            <select id="modelSelect"></select>
+          </div>
+          <div class="token-field">
+            <label for="currentToken">当前 Token</label>
+            <input id="currentToken" type="text" readonly />
+          </div>
+          <div class="token-field wide">
+            <label for="newToken">新 Token</label>
+            <input id="newToken" type="text" placeholder="输入新的 token..." />
+          </div>
+        </div>
+        <div class="token-actions">
+          <div class="token-msg" id="tokenMsg">请选择模型并输入新 Token。</div>
+          <button class="token-save-btn" id="tokenSaveBtn" disabled>更换 Token</button>
+        </div>
+      </section>
+
+      <!-- Console Output -->
+      <div class="console" id="consoleBox">
+        <div class="console-header">
+          <span class="console-dot"></span>
+          <span class="console-dot"></span>
+          <span class="console-dot"></span>
+          <span class="console-title">terminal</span>
+        </div>
+        <pre id="output">命令输出会显示在这里。</pre>
+      </div>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <div class="footer-left">
+          <span class="footer-dot"></span>
+          <span class="footer-text">Secure &middot; Localhost only</span>
+        </div>
+        <span class="footer-author">作者：长白君</span>
+      </footer>
+
+    </main>
+
+    <script>
+      /* ══════════════════════════════════════════════
+         Particle Network Background
+         ══════════════════════════════════════════════ */
+      (function initParticles() {
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let w, h;
+        const PARTICLE_COUNT = 60;
+        const MAX_DIST = 120;
+        let mouse = { x: -9999, y: -9999 };
+        let animId;
+
+        function resize() {
+          w = canvas.width = window.innerWidth;
+          h = canvas.height = window.innerHeight;
+        }
+
+        function createParticles() {
+          particles = [];
+          for (let i = 0; i < PARTICLE_COUNT; i++) {
+            particles.push({
+              x: Math.random() * w,
+              y: Math.random() * h,
+              vx: (Math.random() - 0.5) * 0.3,
+              vy: (Math.random() - 0.5) * 0.3,
+              r: Math.random() * 1.5 + 0.5,
+              opacity: Math.random() * 0.3 + 0.1
+            });
+          }
+        }
+
+        function draw() {
+          ctx.clearRect(0, 0, w, h);
+
+          for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+
+            if (p.x < 0) p.x = w;
+            if (p.x > w) p.x = 0;
+            if (p.y < 0) p.y = h;
+            if (p.y > h) p.y = 0;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(138, 112, 85, ${p.opacity})`;
+            ctx.fill();
+
+            for (let j = i + 1; j < particles.length; j++) {
+              const q = particles[j];
+              const dx = p.x - q.x;
+              const dy = p.y - q.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+
+              if (dist < MAX_DIST) {
+                const alpha = (1 - dist / MAX_DIST) * 0.06;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(q.x, q.y);
+                ctx.strokeStyle = `rgba(138, 112, 85, ${alpha})`;
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+              }
+            }
+
+            // Mouse interaction
+            const mx = p.x - mouse.x;
+            const my = p.y - mouse.y;
+            const md = Math.sqrt(mx * mx + my * my);
+            if (md < 150) {
+              const alpha = (1 - md / 150) * 0.12;
+              ctx.beginPath();
+              ctx.moveTo(p.x, p.y);
+              ctx.lineTo(mouse.x, mouse.y);
+              ctx.strokeStyle = `rgba(138, 112, 85, ${alpha})`;
+              ctx.lineWidth = 0.6;
+              ctx.stroke();
+            }
+          }
+
+          animId = requestAnimationFrame(draw);
+        }
+
+        window.addEventListener('resize', () => {
+          resize();
+          particles = [];
+          createParticles();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+          mouse.x = e.clientX;
+          mouse.y = e.clientY;
+        });
+
+        document.addEventListener('mouseleave', () => {
+          mouse.x = -9999;
+          mouse.y = -9999;
+        });
+
+        resize();
+        createParticles();
+        draw();
+      })();
+
+      /* ══════════════════════════════════════════════
+         Floating Small Elements
+         ══════════════════════════════════════════════ */
+      (function initFloaters() {
+        const container = document.getElementById('floaters');
+        const types = ['floater-dot', 'floater-ring', 'floater-cross', 'floater-line'];
+
+        function spawn() {
+          const el = document.createElement('div');
+          const type = types[Math.floor(Math.random() * types.length)];
+          el.className = `floater ${type}`;
+          el.style.left = Math.random() * 100 + '%';
+          el.style.animationDuration = (Math.random() * 20 + 15) + 's';
+          el.style.animationDelay = Math.random() * 5 + 's';
+
+          if (type === 'floater-line') {
+            el.style.transform = `rotate(${Math.random() * 360}deg)`;
+          }
+
+          container.appendChild(el);
+
+          el.addEventListener('animationend', () => el.remove());
+        }
+
+        // Initial batch
+        for (let i = 0; i < 15; i++) {
+          setTimeout(spawn, Math.random() * 6000);
+        }
+
+        // Continuous spawn
+        setInterval(() => {
+          if (container.children.length < 20) spawn();
+        }, 2000);
+      })();
+
+      /* ══════════════════════════════════════════════
+         Application Logic
+         ══════════════════════════════════════════════ */
+      const output = document.getElementById('output');
+      const consoleBox = document.getElementById('consoleBox');
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      const statusTime = document.getElementById('statusTime');
+      const addressCard = document.getElementById('addressCard');
+      const addressText = document.getElementById('addressText');
+      const copyButton = document.getElementById('copyButton');
+      const tokenPanel = document.getElementById('tokenPanel');
+      const modelSelect = document.getElementById('modelSelect');
+      const currentTokenInput = document.getElementById('currentToken');
+      const newTokenInput = document.getElementById('newToken');
+      const tokenMsg = document.getElementById('tokenMsg');
+      const tokenSaveBtn = document.getElementById('tokenSaveBtn');
+      const buttons = Array.from(document.querySelectorAll('button[data-action]'));
+      let latestAddress = '';
+      let modelTokens = [];
+
+      function setStatus(type, text) {
+        statusDot.className = 'status-dot';
+        if (type) statusDot.classList.add(type);
+        statusText.textContent = text;
+      }
+
+      function setTime(text) {
+        statusTime.textContent = text;
+      }
+
+      async function copyAddress() {
+        if (!latestAddress) return;
+        try {
+          await navigator.clipboard.writeText(latestAddress);
+          copyButton.title = '已复制';
+          setTimeout(() => { copyButton.title = '复制地址'; }, 1200);
+        } catch {
+          const input = document.createElement('textarea');
+          input.value = latestAddress;
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand('copy');
+          input.remove();
+        }
+      }
+
+      copyButton.addEventListener('click', copyAddress);
+
+      function setTokenMessage(type, text) {
+        tokenMsg.className = 'token-msg';
+        if (type === 'ok') tokenMsg.classList.add('ok');
+        if (type === 'err') tokenMsg.classList.add('err');
+        tokenMsg.textContent = text;
+      }
+
+      function validateTokenLocally(token) {
+        if (!token) return { ok: false, error: 'Token 不能为空。' };
+        if (/\s/.test(token)) return { ok: false, error: 'Token 不能包含空格或换行。' };
+        if (token.length < 20) return { ok: false, error: 'Token 长度过短（至少 20 位）。' };
+        if (token.length > 512) return { ok: false, error: 'Token 长度过长（最多 512 位）。' };
+        if (!/^[\x21-\x7E]+$/.test(token)) return { ok: false, error: 'Token 仅允许可见 ASCII 字符。' };
+        return { ok: true };
+      }
+
+      function refreshCurrentToken() {
+        const selectedModel = modelSelect.value;
+        const match = modelTokens.find((item) => item.model === selectedModel);
+        currentTokenInput.value = match ? match.token : '';
+      }
+
+      function updateTokenSaveState() {
+        const selectedModel = modelSelect.value;
+        const nextToken = newTokenInput.value;
+        const validation = validateTokenLocally(nextToken);
+
+        if (!selectedModel) {
+          tokenSaveBtn.disabled = true;
+          setTokenMessage('err', '请先选择模型。');
+          return;
+        }
+
+        if (!validation.ok) {
+          tokenSaveBtn.disabled = true;
+          setTokenMessage('err', validation.error);
+          return;
+        }
+
+        tokenSaveBtn.disabled = false;
+        setTokenMessage('ok', 'Token 格式通过校验，可提交。');
+      }
+
+      async function loadModelTokens() {
+        const res = await fetch('/api/model-tokens');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || '读取模型列表失败。');
+        modelTokens = data.models || [];
+        modelSelect.innerHTML = '';
+        modelTokens.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.model;
+          option.textContent = item.model;
+          modelSelect.appendChild(option);
+        });
+        refreshCurrentToken();
+        updateTokenSaveState();
+      }
+
+      async function handleManageModelToken() {
+        tokenPanel.classList.add('show');
+        consoleBox.style.display = 'none';
+        addressCard.classList.remove('show');
+        setStatus('running', '读取模型配置中...');
+        setTime('动作: 更换模型 Token');
+        try {
+          await loadModelTokens();
+          if (!modelTokens.length) {
+            setTokenMessage('err', '未找到可用模型。');
+            setStatus('err', '未找到可用模型');
+            return;
+          }
+          setStatus('ok', '模型配置已加载');
+          setTokenMessage('ok', '请选择模型并输入新 Token。');
+        } catch (error) {
+          setTokenMessage('err', error.message);
+          setStatus('err', '读取模型配置失败');
+        }
+      }
+
+      async function updateModelToken() {
+        const model = modelSelect.value;
+        const newToken = newTokenInput.value;
+        const validation = validateTokenLocally(newToken);
+        let updated = false;
+        if (!validation.ok) {
+          setTokenMessage('err', validation.error);
+          return;
+        }
+
+        tokenSaveBtn.disabled = true;
+        setTokenMessage('ok', '正在更新...');
+        try {
+          const res = await fetch('/api/model-tokens/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, newToken })
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            setTokenMessage('err', data.error || '更新失败。');
+            setStatus('err', '更新失败');
+            return;
+          }
+
+          const idx = modelTokens.findIndex((item) => item.model === model);
+          if (idx >= 0) modelTokens[idx].token = newToken;
+          refreshCurrentToken();
+          newTokenInput.value = '';
+          setTokenMessage('ok', 'Token 已更新。');
+          setStatus('ok', 'Token 更新成功');
+          setTime(`${model} - ${new Date().toLocaleString()}`);
+          updated = true;
+        } catch (error) {
+          setTokenMessage('err', `请求失败: ${error.message}`);
+          setStatus('err', '更新失败');
+        } finally {
+          if (!updated) updateTokenSaveState();
+        }
+      }
+
+      modelSelect.addEventListener('change', () => {
+        refreshCurrentToken();
+        updateTokenSaveState();
+      });
+      newTokenInput.addEventListener('input', updateTokenSaveState);
+      tokenSaveBtn.addEventListener('click', updateModelToken);
+
+      async function runAction(action, label) {
+        if (action === 'manage_model_token') return handleManageModelToken();
+
+        buttons.forEach((b) => (b.disabled = true));
+        setStatus('running', '执行中，请稍候...');
+        setTime(`动作: ${label}`);
+        addressCard.classList.remove('show');
+        tokenPanel.classList.remove('show');
+        latestAddress = '';
+        consoleBox.style.display = 'block';
+        output.textContent = '';
+
+        try {
+          const res = await fetch('/api/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action })
+          });
+          const data = await res.json();
+
+          let lines = [];
+          if (action === 'get_frontend_url' && data.ok) {
+            latestAddress = data.address || '';
+            addressText.textContent = latestAddress || '未获取到地址';
+            addressCard.classList.add('show');
+          } else {
+            lines = [
+              `$ ${data.command || ''}`,
+              '',
+              data.address ? `[address]\n${data.address}` : '',
+              data.stdout ? `[stdout]\n${data.stdout}` : '',
+              data.stderr ? `[stderr]\n${data.stderr}` : '',
+              `\n退出码: ${typeof data.code === 'number' ? data.code : '未知'}`
+            ].filter(Boolean);
+          }
+
+          consoleBox.style.display = lines.length ? 'block' : 'none';
+          output.textContent = lines.join('\n');
+
+          if (data.ok) {
+            setStatus('ok', '执行成功');
+          } else {
+            setStatus('err', data.message || '执行失败');
+          }
+        } catch (err) {
+          setStatus('err', `请求失败: ${err.message}`);
+          consoleBox.style.display = 'block';
+          output.textContent = '无法连接到后端服务。';
+        } finally {
+          buttons.forEach((b) => (b.disabled = false));
+          setTime(`${label} - ${new Date().toLocaleString()}`);
+        }
+      }
+
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => runAction(button.dataset.action, button.querySelector('.btn-label').textContent.trim()));
+      });
+    </script>
+  </body>
+</html>

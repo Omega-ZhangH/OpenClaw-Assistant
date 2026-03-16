@@ -1,0 +1,10 @@
+{
+  "name": "openclaw-assistant",
+  "version": "2.0.0",
+  "private": true,
+  "description": "OpenClaw local command web UI — refined edition",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
